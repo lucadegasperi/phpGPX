@@ -163,7 +163,7 @@ class GpxFile implements Summarizable
 		return $document;
 	}
 
-	public function toGeoJSON()
+	public function toGeoJSON($format = null)
     {
         $document = [
             "type" => "FeatureCollection",
@@ -172,28 +172,86 @@ class GpxFile implements Summarizable
             "features" => []
         ];
 
-        foreach ($this->tracks as $track) {
-            foreach($track->segments as $segmentIndex => $segment) {
-                foreach($segment->getPoints() as $index => $point) {
-                    $document['features'][] = [
-                        "type" => "Feature",
-                        "properties" => [
-                            "ele" => $point->elevation,
-                            "track_fid" => $track->number,
-                            "track_seg_id" => $segmentIndex,
-                            "track_seg_point_id" => $index,
-                            "time" => DateTimeHelper::formatDateTime($point->time, phpGPX::$DATETIME_FORMAT, phpGPX::$DATETIME_TIMEZONE_OUTPUT),
-                        ],
-                        "geometry" => [
-                            "type" => "Point",
-                            "coordinates" => [
-                                (float) $point->longitude,
-                                (float) $point->latitude
+        if (is_null($format) || $format === phpGPX::GEOJSON_POINTS_FORMAT) {
+            foreach ($this->tracks as $trackIndex => $track) {
+                foreach ($track->segments as $segmentIndex => $segment) {
+                    foreach ($segment->getPoints() as $index => $point) {
+                        $coordinates = [
+                            (float)$point->longitude,
+                            (float)$point->latitude
+                        ];
+                        if (!is_null($point->elevation) || $point->elevation > 0) {
+                            $coordinates[] = (float)$point->elevation;
+                        }
+                        $document['features'][] = [
+                            "type" => "Feature",
+                            "properties" => [
+                                "ele" => $point->elevation,
+                                "track_fid" => $trackIndex,
+                                "track_seg_id" => $segmentIndex,
+                                "track_seg_point_id" => $index,
+                                "time" => DateTimeHelper::formatDateTime($point->time, phpGPX::$DATETIME_FORMAT, phpGPX::$DATETIME_TIMEZONE_OUTPUT),
+                            ],
+                            "geometry" => [
+                                "type" => "Point",
+                                "coordinates" => $coordinates
                             ]
-                        ]
-                    ];
+                        ];
+                    }
                 }
             }
+        } else if ($format === phpGPX::GEOJSON_LINES_FORMAT) {
+            foreach($this->tracks as $track) {
+                $lineCoordinates = [];
+                $times = [];
+                foreach($track->getPoints() as $point) {
+                    $coordinates = [(float)$point->longitude, (float)$point->latitude];
+                    if(!is_null($point->elevation) || $point->elevation > 0) {
+                        $coordinates[] = (float)$point->elevation;
+                    }
+                    $lineCoordinates[] = $coordinates;
+                    $times[] = DateTimeHelper::formatDateTime($point->time, phpGPX::$DATETIME_FORMAT, phpGPX::$DATETIME_TIMEZONE_OUTPUT);
+                }
+
+                $document['features'][] = [
+                    "type" => "Feature",
+                    "properties" => [
+                        "name" => $track->name,
+                        "time" => $times[0],
+                        "coordTimes" => $times
+                    ],
+                    "geometry" => [
+                        "type" => "LineString",
+                        "coordinates" => $lineCoordinates
+                    ]
+                ];
+            }
+        }
+
+        foreach ($this->waypoints as $waypoint) {
+            $coordinates = [
+                (float)$waypoint->longitude,
+                (float)$waypoint->latitude
+            ];
+            if (!is_null($waypoint->elevation) || $waypoint->elevation > 0) {
+                $coordinates[] = (float)$waypoint->elevation;
+            }
+            $document['features'][] = [
+                "type" => "Feature",
+                "properties" => [
+                    "type" => $waypoint->type,
+                    "name" => $waypoint->name,
+                    "comment" => $waypoint->comment,
+                    "description" => $waypoint->description,
+                    "ele" => $waypoint->elevation,
+                    "time" => DateTimeHelper::formatDateTime($waypoint->time, phpGPX::$DATETIME_FORMAT,
+                        phpGPX::$DATETIME_TIMEZONE_OUTPUT),
+                ],
+                "geometry" => [
+                    "type" => "Point",
+                    "coordinates" => $coordinates
+                ]
+            ];
         }
 
         return json_encode($document);
@@ -214,6 +272,12 @@ class GpxFile implements Summarizable
 			case phpGPX::JSON_FORMAT:
 				file_put_contents($path, $this->toJSON());
 				break;
+            case phpGPX::GEOJSON_POINTS_FORMAT:
+                file_put_contents($path, $this->toGeoJSON(phpGPX::GEOJSON_POINTS_FORMAT));
+                break;
+            case phpGPX::GEOJSON_LINES_FORMAT:
+                file_put_contents($path, $this->toGeoJSON(phpGPX::GEOJSON_LINES_FORMAT));
+                break;
 			default:
 				throw new \RuntimeException("Unsupported file format!");
 		};

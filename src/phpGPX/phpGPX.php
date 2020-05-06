@@ -18,6 +18,8 @@ use phpGPX\Parsers\WaypointParser;
  */
 class phpGPX
 {
+    const GEOJSON_LINES_FORMAT = 'geojsonLines';
+    const GEOJSON_POINTS_FORMAT = 'geojsonPoints';
 	const JSON_FORMAT = 'json';
 	const XML_FORMAT = 'xml';
 
