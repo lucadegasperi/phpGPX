@@ -6,6 +6,7 @@
 
 namespace phpGPX\Models;
 
+use phpGPX\Helpers\DateTimeHelper;
 use phpGPX\Helpers\SerializationHelper;
 use phpGPX\Parsers\ExtensionParser;
 use phpGPX\Parsers\MetadataParser;
@@ -161,6 +162,42 @@ class GpxFile implements Summarizable
 		}
 		return $document;
 	}
+
+	public function toGeoJSON()
+    {
+        $document = [
+            "type" => "FeatureCollection",
+            "name" => "track_points",
+            "crs" => ["type" => "name", "properties" => ["name" => "urn:ogc:def:crs:OGC:1.3:CRS84"]],
+            "features" => []
+        ];
+
+        foreach ($this->tracks as $track) {
+            foreach($track->segments as $segment) {
+                foreach($segment->getPoints() as $point) {
+                    $document['features'][] = [
+                        "type" => "Feature",
+                        "properties" => [
+                            "ele" => $point->elevation,
+                            "track_fid" => $track->number,
+                            "track_seg_id" => $segment->number,
+                            "track_seg_point_id" => $point->number,
+                            "time" => DateTimeHelper::formatDateTime($point->time, phpGPX::$DATETIME_FORMAT, phpGPX::$DATETIME_TIMEZONE_OUTPUT),
+                        ],
+                        "geometry" => [
+                            "type" => "Point",
+                            "coordinates" => [
+                                (float) $point->longitude,
+                                (float) $point->latitude
+                            ]
+                        ]
+                    ];
+                }
+            }
+        }
+
+        return json_encode($document);
+    }
 
 	/**
 	 * Save data to file according to selected format.
