@@ -174,14 +174,14 @@ class GpxFile implements Summarizable
 
         foreach ($this->tracks as $track) {
             foreach($track->segments as $segmentIndex => $segment) {
-                foreach($segment->getPoints() as $point) {
+                foreach($segment->getPoints() as $index => $point) {
                     $document['features'][] = [
                         "type" => "Feature",
                         "properties" => [
                             "ele" => $point->elevation,
                             "track_fid" => $track->number,
                             "track_seg_id" => $segmentIndex,
-                            "track_seg_point_id" => $point->number,
+                            "track_seg_point_id" => $index,
                             "time" => DateTimeHelper::formatDateTime($point->time, phpGPX::$DATETIME_FORMAT, phpGPX::$DATETIME_TIMEZONE_OUTPUT),
                         ],
                         "geometry" => [
